@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>랜덤 비밀번호 생성기</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter 폰트 설정 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* 1. CSS 변수를 사용하여 다크/라이트 모드 색상 정의 */
+        :root {
+            /* 라이트 테마 (기본값) */
+            --color-bg: #f0f4f8;
+            --color-card-bg: #ffffff;
+            --color-text-main: #1f2937;
+            --color-text-sub: #6b7280;
+            --color-input-bg: #f3f4f6;
+            --color-nav-bg: #e5e7eb;
+            --color-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        [data-theme="dark"] {
+            /* 다크 테마 오버라이드 */
+            --color-bg: #0d1117;
+            --color-card-bg: #161b22;
+            --color-text-main: #ffffff;
+            --color-text-sub: #9ca3af;
+            --color-input-bg: #374151;
+            --color-nav-bg: #1f2937;
+            --color-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg); /* 배경색 적용 */
+            color: var(--color-text-main); /* 기본 텍스트 색상 적용 */
+            transition: background-color 0.3s;
+        }
+
+        /* 커스텀 클래스를 Tailwind 클래스처럼 사용 */
+        .theme-card-bg { background-color: var(--color-card-bg); }
+        .theme-nav-bg { background-color: var(--color-nav-bg); }
+        .theme-input-bg { background-color: var(--color-input-bg); }
+        .theme-text-main { color: var(--color-text-main); }
+        .theme-text-sub { color: var(--color-text-sub); }
+        .theme-shadow { box-shadow: var(--color-shadow); }
+
+        /* 토스트 메시지 스타일 (alert 대신 사용) */
+        .toast {
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <!-- 메인 컨테이너 -->
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-xl rounded-2xl theme-card-bg theme-shadow p-6 md:p-8 transition duration-300">
+            
+            <!-- 제목 및 테마 토글 -->
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-3xl font-extrabold theme-text-main flex-1 text-center">🔑 강력한 비밀번호 생성기</h1>
+                <button id="theme-toggle" onclick="toggleTheme()" 
+                        class="p-2 rounded-full theme-nav-bg theme-text-main hover:opacity-80 transition duration-200 ml-4">
+                    <!-- 달 아이콘 (다크 모드 상태일 때 보임) -->
+                    <svg id="moon-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                    <!-- 해 아이콘 (라이트 모드 상태일 때 보임) -->
+                    <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- 탭 네비게이션 -->
+            <div class="flex space-x-2 p-1 theme-nav-bg rounded-full mb-6 transition duration-300">
+                <button id="tab-pin" onclick="switchTab('pin')" 
+                        class="tab-btn flex-1 py-2 text-sm font-semibold rounded-full transition duration-300 bg-indigo-600 text-white shadow-md">
+                    6자리 숫자 (OTP/PIN)
+                </button>
+                <button id="tab-general" onclick="switchTab('general')" 
+                        class="tab-btn flex-1 py-2 text-sm font-semibold rounded-full transition duration-300 theme-text-sub hover:bg-gray-400/50">
+                    일반 비밀번호
+                </button>
+            </div>
+            
+            <!-- 토스트 메시지 (복사 완료 알림) -->
+            <div id="toast" class="toast fixed top-5 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg z-50">
+                복사 완료!
+            </div>
+
+            <!-- 1. 6자리 숫자 생성 탭 내용 -->
+            <div id="pin-tab" class="tab-content space-y-6">
+                <p class="theme-text-sub text-center">임시 비밀번호나 인증 번호로 사용하기 위한 6자리 숫자를 생성합니다.</p>
+                
+                <!-- 출력 영역 -->
+                <div class="flex items-center space-x-3 theme-input-bg rounded-xl p-4 transition duration-300">
+                    <input type="text" id="pin-output" readonly value="______" 
+                           class="flex-grow bg-transparent text-3xl font-mono tracking-widest text-indigo-500 border-none outline-none caret-transparent select-all">
+                    <button onclick="generate6DigitPin()" 
+                            class="p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition duration-200 shadow-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.356-2A8.001 8.001 0 0019.418 15m0 0H15" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- 복사 버튼 -->
+                <button onclick="copyPin()" 
+                        class="w-full py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold rounded-xl transition duration-200">
+                    클립보드에 복사하기
+                </button>
+            </div>
+            
+            <!-- 2. 일반 비밀번호 생성 탭 내용 -->
+            <div id="general-tab" class="tab-content space-y-6 hidden">
+                <p class="theme-text-sub text-center">대소문자, 숫자, 특수문자를 조합한 강력한 비밀번호를 만드세요.</p>
+
+                <!-- 출력 영역 -->
+                <div class="flex flex-col space-y-2 theme-input-bg rounded-xl p-4 transition duration-300">
+                    <input type="text" id="password-output" readonly value="P@$$wOrd123!" 
+                           class="flex-grow bg-transparent text-xl font-mono text-indigo-500 border-none outline-none caret-transparent select-all">
+                    <div id="strength-meter" class="h-2 rounded-full theme-nav-bg">
+                        <div id="strength-bar" class="h-full rounded-full transition-all duration-300" style="width: 50%; background-color: #f59e0b;"></div>
+                    </div>
+                    <p id="strength-text" class="text-right text-sm text-yellow-500 font-semibold">보통</p>
+                </div>
+
+                <!-- 설정 옵션 -->
+                <div class="space-y-4 theme-input-bg p-5 rounded-xl transition duration-300">
+                    
+                    <!-- 길이 설정 -->
+                    <div class="flex flex-col">
+                        <label for="length" class="theme-text-main font-semibold mb-2">비밀번호 길이: <span id="length-value" class="text-indigo-500">12</span></label>
+                        <input type="range" id="length" min="4" max="32" value="12" 
+                               class="w-full h-2 theme-nav-bg rounded-lg appearance-none cursor-pointer range-lg"
+                               oninput="document.getElementById('length-value').innerText = this.value; generatePassword()">
+                    </div>
+
+                    <!-- 포함할 문자 유형 -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center theme-text-main">
+                            <input type="checkbox" id="include-uppercase" checked class="form-checkbox h-5 w-5 text-indigo-600 bg-gray-600 border-gray-500 rounded focus:ring-indigo-500" onchange="generatePassword()">
+                            <span class="ml-2">대문자 (A-Z)</span>
+                        </label>
+                        <label class="flex items-center theme-text-main">
+                            <input type="checkbox" id="include-lowercase" checked class="form-checkbox h-5 w-5 text-indigo-600 bg-gray-600 border-gray-500 rounded focus:ring-indigo-500" onchange="generatePassword()">
+                            <span class="ml-2">소문자 (a-z)</span>
+                        </label>
+                        <label class="flex items-center theme-text-main">
+                            <input type="checkbox" id="include-numbers" checked class="form-checkbox h-5 w-5 text-indigo-600 bg-gray-600 border-gray-500 rounded focus:ring-indigo-500" onchange="generatePassword()">
+                            <span class="ml-2">숫자 (0-9)</span>
+                        </label>
+                        <label class="flex items-center theme-text-main">
+                            <input type="checkbox" id="include-symbols" checked class="form-checkbox h-5 w-5 text-indigo-600 bg-gray-600 border-gray-500 rounded focus:ring-indigo-500" onchange="generatePassword()">
+                            <span class="ml-2">특수문자 (!@#$)</span>
+                        </label>
+                    </div>
+                    
+                    <!-- 버튼 그룹: 재생성 및 복사 -->
+                    <div class="flex space-x-3">
+                        <button onclick="generatePassword()" 
+                                class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition duration-200 shadow-lg">
+                            재생성
+                        </button>
+                        <button onclick="copyGeneralPassword()" 
+                                class="flex-1 py-3 theme-nav-bg text-gray-700 dark:text-gray-300 font-bold rounded-xl transition duration-200 hover:opacity-80 shadow-lg">
+                            클립보드에 복사하기
+                        </button>
+                    </div>
+
+                </div>
+
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        // 상수 정의
+        const UPPERCASE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const LOWERCASE_CHARS = 'abcdefghijklmnopqrstuvwxyz';
+        const NUMBER_CHARS = '0123456789';
+        const SYMBOL_CHARS = '!@#$%^&*()_+[]{}|;:,.<>?';
+        const THEME_KEY = 'password-generator-theme'; // 테마 저장을 위한 키
+
+        // ----------------- UI/UX 함수 -----------------
+
+        /**
+         * alert 대신 사용할 임시 알림 메시지 (Toast) 표시
+         * @param {string} message - 표시할 메시지
+         */
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            // 토스트 배경색을 라이트 모드에서도 잘 보이도록 고정
+            toast.classList.add('bg-green-500', 'text-white');
+            toast.classList.add('show');
+            
+            // 2초 후 메시지 숨기기
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        /**
+         * 클립보드에 텍스트를 복사하고 토스트 메시지를 표시합니다.
+         * @param {string} text - 복사할 텍스트
+         */
+        function copyToClipboard(text) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                // document.execCommand('copy')는 Iframe 환경에서 클립보드 복사를 위해 사용됩니다.
+                document.execCommand('copy'); 
+                showToast('복사 완료!');
+            } catch (err) {
+                console.error('클립보드 복사 실패:', err);
+                showToast('복사 실패! (콘솔 확인)');
+            }
+            
+            document.body.removeChild(tempInput);
+        }
+        
+        // ----------------- 테마 전환 로직 -----------------
+
+        /**
+         * 테마를 적용하고 LocalStorage에 저장합니다.
+         * @param {string} theme - 'dark' 또는 'light'
+         */
+        function applyTheme(theme) {
+            const body = document.body;
+            const sunIcon = document.getElementById('sun-icon');
+            const moonIcon = document.getElementById('moon-icon');
+
+            body.setAttribute('data-theme', theme);
+            
+            const isDark = theme === 'dark';
+            
+            // 아이콘 가시성 토글
+            moonIcon.classList.toggle('hidden', !isDark);
+            sunIcon.classList.toggle('hidden', isDark);
+
+            // LocalStorage에 저장
+            localStorage.setItem(THEME_KEY, theme);
+            
+            // 테마 변경 시 탭 UI도 업데이트 (필요한 경우)
+            // 현재 활성화된 탭을 찾아서 다시 활성화하여 색상 업데이트
+            const currentTab = document.querySelector('.tab-content:not(.hidden)').id.replace('-tab', '');
+            if (currentTab) {
+                switchTab(currentTab);
+            }
+        }
+
+        /**
+         * 현재 테마를 전환합니다.
+         */
+        function toggleTheme() {
+            const currentTheme = document.body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(newTheme);
+        }
+        
+        /**
+         * 탭 전환 처리
+         * @param {string} tabId - 'pin' 또는 'general'
+         */
+        function switchTab(tabId) {
+            const pinTab = document.getElementById('pin-tab');
+            const generalTab = document.getElementById('general-tab');
+            const pinBtn = document.getElementById('tab-pin');
+            const generalBtn = document.getElementById('tab-general');
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+
+            // 비활성화된 버튼의 텍스트 색상을 테마에 맞게 조정
+            const inactiveTextColor = isDark ? 'text-gray-300' : 'text-gray-700';
+            const inactiveBgHover = isDark ? 'hover:bg-gray-400/50' : 'hover:bg-gray-200';
+
+            // 모든 탭 버튼 초기화 (테마에 맞는 비활성화 스타일 적용)
+            [pinBtn, generalBtn].forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+                // 기존 텍스트 및 호버 색상 클래스 제거 (깔끔한 테마 적용을 위해)
+                btn.className = btn.className.replace(/text-(gray|indigo)-\d{3}/g, ''); 
+                btn.className = btn.className.replace(/hover:bg-(gray|indigo)-\d{3}\/\d{2}/g, ''); 
+                btn.classList.add(inactiveTextColor, inactiveBgHover);
+            });
+
+
+            if (tabId === 'pin') {
+                pinTab.classList.remove('hidden');
+                generalTab.classList.add('hidden');
+                pinBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                pinBtn.classList.remove(inactiveTextColor, inactiveBgHover);
+            } else if (tabId === 'general') {
+                pinTab.classList.add('hidden');
+                generalTab.classList.remove('hidden');
+                generalBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                generalBtn.classList.remove(inactiveTextColor, inactiveBgHover);
+                // 일반 비밀번호 탭으로 전환 시 자동 생성
+                generatePassword();
+            }
+        }
+
+        // ----------------- 1. 6자리 숫자 (PIN) 생성 로직 -----------------
+
+        function generate6DigitPin() {
+            let pin = '';
+            // 6자리 숫자를 랜덤으로 생성
+            for (let i = 0; i < 6; i++) {
+                pin += Math.floor(Math.random() * 10);
+            }
+            document.getElementById('pin-output').value = pin;
+        }
+
+        function copyPin() {
+            const pin = document.getElementById('pin-output').value;
+            if (pin === '______') {
+                showToast('먼저 생성 버튼을 눌러주세요.');
+                return;
+            }
+            copyToClipboard(pin);
+        }
+
+        // ----------------- 2. 일반 비밀번호 생성 로직 -----------------
+        
+        /**
+         * 현재 표시된 일반 비밀번호를 클립보드에 복사합니다.
+         */
+        function copyGeneralPassword() {
+            const password = document.getElementById('password-output').value;
+            
+            // 유효하지 않은 기본값이나 에러 메시지를 복사하지 않도록 확인
+            if (password === "옵션을 선택하세요!" || password === "P@$$wOrd123!" || !password) {
+                 showToast('먼저 유효한 비밀번호를 생성해주세요.');
+                 return;
+            }
+            
+            copyToClipboard(password);
+        }
+
+        /**
+         * 비밀번호 강도 측정 및 UI 업데이트
+         * @param {string} password - 측정할 비밀번호
+         */
+        function updateStrength(password) {
+            const strengthBar = document.getElementById('strength-bar');
+            const strengthText = document.getElementById('strength-text');
+
+            let score = 0;
+            const length = password.length;
+            const hasUpper = /[A-Z]/.test(password);
+            const hasLower = /[a-z]/.test(password);
+            const hasNumber = /[0-9]/.test(password);
+            const hasSymbol = /[!@#$%^&*()_+[\]{}|;:,.<>?]/.test(password);
+            
+            // 길이 점수
+            if (length >= 8) score += 20;
+            if (length >= 12) score += 20;
+            if (length >= 16) score += 20;
+
+            // 문자 유형 점수
+            const types = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length;
+            score += (types * 10);
+
+            // 최종 강도 및 색상 결정
+            let strengthLabel = "매우 약함";
+            let color = '#ef4444'; // Red (매우 약함)
+            let width = Math.min(score, 100);
+
+            if (width >= 80) {
+                strengthLabel = "매우 강함";
+                color = '#10b981'; // Green (매우 강함)
+            } else if (width >= 60) {
+                strengthLabel = "강함";
+                color = '#3b82f6'; // Blue (강함)
+            } else if (width >= 40) {
+                strengthLabel = "보통";
+                color = '#f59e0b'; // Yellow (보통)
+            } else if (width >= 20) {
+                strengthLabel = "약함";
+                color = '#f97316'; // Orange (약함)
+            }
+
+            strengthBar.style.width = `${width}%`;
+            strengthBar.style.backgroundColor = color;
+            strengthText.textContent = strengthLabel;
+            strengthText.style.color = color;
+        }
+
+
+        function generatePassword() {
+            const length = parseInt(document.getElementById('length').value, 10);
+            const includeUppercase = document.getElementById('include-uppercase').checked;
+            const includeLowercase = document.getElementById('include-lowercase').checked;
+            const includeNumbers = document.getElementById('include-numbers').checked;
+            const includeSymbols = document.getElementById('include-symbols').checked;
+
+            let charSet = '';
+            let mustInclude = [];
+            let password = '';
+
+            // 선택된 문자 유형에 따라 문자 세트 및 필수 포함 문자 설정
+            if (includeUppercase) {
+                charSet += UPPERCASE_CHARS;
+                mustInclude.push(UPPERCASE_CHARS[Math.floor(Math.random() * UPPERCASE_CHARS.length)]);
+            }
+            if (includeLowercase) {
+                charSet += LOWERCASE_CHARS;
+                mustInclude.push(LOWERCASE_CHARS[Math.floor(Math.random() * LOWERCASE_CHARS.length)]);
+            }
+            if (includeNumbers) {
+                charSet += NUMBER_CHARS;
+                mustInclude.push(NUMBER_CHARS[Math.floor(Math.random() * NUMBER_CHARS.length)]);
+            }
+            if (includeSymbols) {
+                charSet += SYMBOL_CHARS;
+                mustInclude.push(SYMBOL_CHARS[Math.floor(Math.random() * SYMBOL_CHARS.length)]);
+            }
+
+            // 아무것도 선택되지 않은 경우 처리 (최소한의 안전 장치)
+            if (charSet.length === 0) {
+                document.getElementById('password-output').value = "옵션을 선택하세요!";
+                updateStrength("");
+                return;
+            }
+
+            // 1. 필수 문자를 먼저 추가
+            password = mustInclude.join('');
+
+            // 2. 나머지 길이만큼 랜덤 문자를 추가
+            const remainingLength = length - mustInclude.length;
+            for (let i = 0; i < remainingLength; i++) {
+                const randomIndex = Math.floor(Math.random() * charSet.length);
+                password += charSet[randomIndex];
+            }
+
+            // 3. 비밀번호를 섞어서 패턴을 없애고 최종 길이로 자르기
+            password = password.split('').sort(() => 0.5 - Math.random()).join('').slice(0, length);
+            
+            // 결과 업데이트
+            document.getElementById('password-output').value = password;
+            updateStrength(password);
+            
+            // 자동 복사는 주석 처리하고, 별도 버튼을 통해 복사하도록 유도합니다.
+            // copyToClipboard(password); 
+
+        }
+
+        // ----------------- 초기 실행 -----------------
+        window.onload = function() {
+            // 1. 테마 초기화 (Local Storage 또는 시스템 기본 설정에 따름)
+            let savedTheme = localStorage.getItem(THEME_KEY);
+            if (!savedTheme) {
+                // 저장된 테마가 없으면 시스템 기본 설정을 따름
+                // prefers-color-scheme: light 이면 'light' 아니면 'dark'
+                savedTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            }
+            applyTheme(savedTheme);
+
+            // 2. 6자리 숫자 탭 초기화 및 비밀번호 생성
+            generate6DigitPin();
+            
+            // 3. 일반 비밀번호 탭의 초기 비밀번호 생성
+            generatePassword();
+            
+            // 4. 초기 탭 활성화 (PIN 탭)
+            switchTab('pin');
+        };
+
+    </script>
+
+</body>
+</html>
